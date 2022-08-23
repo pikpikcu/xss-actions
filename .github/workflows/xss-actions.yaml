@@ -38,6 +38,7 @@ jobs:
           go install github.com/hahwul/dalfox/v2@latest
           go install github.com/bp0lr/gauplus@latest
           go install -v github.com/projectdiscovery/notify/cmd/notify@latest
+          go install github.com/tomnomnom/waybackurls@latest
         shell: bash
           
       - name: Finding XSS with Dalfox
