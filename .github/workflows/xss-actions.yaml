@@ -1,0 +1,67 @@
+name: xss-actions
+
+on:
+#    schedule:
+#      - cron: '0 0 * * *'
+# Remove both comments to run this action on daily basis.
+    workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@master
+
+      - name: Setup golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Setup Dependencies
+        run: |
+          pip3 install uro
+        shell: bash
+
+      - name: Cache Go
+        id: cache-go
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/go
+          key: ${{ runner.os }}-go
+
+      - name: Setting up Tools Bugbounty
+        if: steps.cache-go.outputs.cache-hit != 'true'
+        env:
+          GO111MODULE: on
+        run: |
+          go install github.com/hahwul/dalfox/v2@latest
+          go install github.com/bp0lr/gauplus@latest
+          go install -v github.com/projectdiscovery/notify/cmd/notify@latest
+        shell: bash
+          
+      - name: Finding XSS with Dalfox
+        run: |
+          cat input/domains.txt | gauplus -subs | grep "https://" | grep -v "png\|jpg\|css\|js\|gif\|txt" | grep "=" | uro | dalfox pipe --deep-domxss --multicast --blind your.xss.ht -o output/valid_xss.txt
+        shell: bash
+
+      - name: Create local changes
+        run: |
+          git add output/valid_xss.txt
+
+      - name: Send To notify
+        run: |
+          notify -i output/valid_xss.txt -pc config/notify-config.yaml -bulk -id xss
+        shell: bash
+
+      - name: Commit results to Github
+        run: |
+          git config --local user.email "YOUR EMAIL GITHUB"
+          git config --global user.name "USERNAME GITHUB"
+          git commit -m "PD-Actions report" -a --allow-empty
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
